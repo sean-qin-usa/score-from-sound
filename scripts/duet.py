@@ -489,7 +489,7 @@ def main():
     ap.add_argument("--no-stereo", action="store_true", help="ignore left/right position even when the recording is stereo")
     ap.add_argument("--check-overtones", action="store_true", help="remove notes the recording says are only an overtone of a lower note (for pieces with piano)")
     ap.add_argument("--keep-rewrites", action="store_true", help="do not join a held note that the detector wrote twice")
-    ap.add_argument("--solo", default="", help="time ranges where only one violin plays, e.g. 0-13,95-102 (seconds)")
+    ap.add_argument("--solo", default="", help="time ranges where only one violin plays, in seconds, optionally with which violin: 0-13:1,95-102:2. Without a violin number the passage goes, whole, to the part that already holds most of it. A mono recording cannot tell which violin plays alone, so this is where someone who knows the piece helps")
     ap.add_argument("--roles", action="store_true", help="split into a sustained line and a moving line instead of guessing which player is which")
     ap.add_argument("--keep-leaps", action="store_true", help="keep short notes that jump far above their neighbours")
     ap.add_argument("--drop-blips", action="store_true", help="remove short notes on an overtone of a louder note (also hides some real octave doublings)")
@@ -556,22 +556,27 @@ def main():
         stereo = {"split_by": "canon delay", "delay_sec": round(delay, 2), "decided_by_delay_alone": round(decided, 2), "note_pairs_returning_at_delay": strength, "at_a_typical_delay": typical}
     else:
         A, B, stereo = split_parts(notes, args.audio, roles=args.roles, use_stereo=not args.no_stereo, clean=bool(args.notes_from))
-    for span in filter(None, "" if args.roles else args.solo.split(",")):  # a hint from someone who knows the piece
-        lo, hi = (float(x) for x in span.split("-"))
-        inA = [n for n in A if lo <= n.start < hi]
-        inB = [n for n in B if lo <= n.start < hi]
-        if len(inA) >= len(inB):
-            A, B = A + inB, [n for n in B if not lo <= n.start < hi]
-        else:
-            A, B = [n for n in A if not lo <= n.start < hi], B + inA
+    if not args.roles and not args.canon and np.mean([n.pitch for n in A] or [0]) < np.mean([n.pitch for n in B] or [0]):
+        A, B = B, A  # part 1 is the higher violin, so that a hint naming violin 1 or 2 means what it says
     if args.roles:
         A = merge_repeats(A, gap=0.05)  # in the sustained line, back-to-back same pitches are one held note
     A, B = trim_tails(A), trim_tails(B)
     if not args.keep_leaps:
         A, B = drop_leap_blips(A), drop_leap_blips(B)
     healed = 0 if args.roles or args.canon else heal_lines(A, B)
-    if not args.roles and not args.canon and np.mean([n.pitch for n in A] or [0]) < np.mean([n.pitch for n in B] or [0]):
-        A, B = B, A
+    # hints from someone who knows the piece come last, so that no rule undoes them
+    for span in filter(None, "" if args.roles else args.solo.split(",")):  # a hint from someone who knows the piece
+        span, _, player = span.partition(":")
+        lo, hi = (float(x) for x in span.split("-"))
+        inA = [n for n in A if lo <= n.start < hi]
+        inB = [n for n in B if lo <= n.start < hi]
+        to_a = player == "1" if player else len(inA) >= len(inB)
+        if to_a:
+            A, B = A + inB, [n for n in B if not lo <= n.start < hi]
+        else:
+            A, B = [n for n in A if not lo <= n.start < hi], B + inA
+    A.sort(key=lambda n: n.start)
+    B.sort(key=lambda n: n.start)
     names = ("Sustained line", "Moving line") if args.roles else ("Leader", "Follower") if args.canon else ("Violin 1", "Violin 2")
     # the tone check was validated against the pitch-based split; after a split by side it
     # disagrees with nearly half the notes and tells you nothing, so it is skipped there
