@@ -259,7 +259,13 @@ def stitch(pages_dir, layout, beats, last_page=None, helped_dir=None, info_dir=N
         page_info.append({"page": f.name, "read": used, "how": systems[0]["how"], "systems": len(systems), "measures_per_system": [s["measures"] for s in systems]})
     key_log = repair_keys(gathered) if repair else []
     respelled = {}
+    key_per_measure, last = [], 0
     for system in gathered:
+        signatures = system.get("key_at") or [system["keys"][i]["read"] for i in system["blocks"][0]]
+        for j in range(system["measures"]):
+            k = signatures[min(j, len(signatures) - 1)]
+            last = last if k is None else k
+            key_per_measure.append(last)
         for k, j, off, dur, pitch, step, alter, idx, position in system["notes"]:
             if repair:
                 read, right = system["keys"][idx]["read"], system["key_at"][min(position, len(system["key_at"]) - 1)]
@@ -273,7 +279,7 @@ def stitch(pages_dir, layout, beats, last_page=None, helped_dir=None, info_dir=N
         fill += [v / beats for v in per_measure.values()]
         measure_index += system["measures"]
     f = np.array(fill) if fill else np.array([0.0])
-    check = {"measures": measure_index, "staff_measures_filling_the_bar_within_10pct": float(np.mean(np.abs(f - 1) < 0.1)), "pages_skipped": skipped}
+    check = {"measures": measure_index, "staff_measures_filling_the_bar_within_10pct": float(np.mean(np.abs(f - 1) < 0.1)), "pages_skipped": skipped, "key_signature_per_measure": key_per_measure}
     if repair:
         check["key_signature_repair"] = {"notes_respelled": sum(respelled.values()), "notes_respelled_by_page": respelled, "courtesy_measures_removed": sum(e.get("measures_removed", 0) for e in key_log), "decisions": key_log}
     return rows, page_info, check
@@ -313,7 +319,7 @@ def main():
     counts = {name: sum(r["part"] == name for r in rows) for name in dict.fromkeys(layout)}
     meta = {"layout": layout, "beats_per_measure": args.beats, "notes_per_part": counts, "pages": page_info, **check}
     (out / "score_meta.json").write_text(json.dumps(meta, indent=1))
-    print(json.dumps({k: v for k, v in meta.items() if k != "pages"}, indent=1))
+    print(json.dumps({k: v for k, v in meta.items() if k not in ("pages", "key_signature_per_measure")}, indent=1))
 
 
 if __name__ == "__main__":

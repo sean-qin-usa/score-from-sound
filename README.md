@@ -47,12 +47,12 @@ The benchmark above is studio audio that the instrument-aware model was trained 
 
 | Recording | Notes found (recall): model | plain detector | Written notes in the score (precision): model | plain detector | Found notes given to the right player |
 |---|---|---|---|---|---|
-| Bach, Prelude in C, BWV 846 (piano) | **93%** | 85% | **91%** | 58% | one player |
-| Mozart, quartet K. 458, Adagio | **87%** | 74% | 76% | 74% | 84% of four |
-| Joplin, Maple Leaf Rag (piano) | **84%** | 75% | **77%** | 67% | one player |
-| Telemann, canonic sonata no. 1, Vivace (two violins) | 79% | **82%** | 73% | **82%** | 80% with the canon rule, 50% without |
-| Beethoven, quartet Op. 18 No. 1, Adagio (live) | 48% | 41% | 42% | 43% | 71% of four |
-| Bach, chorale from the motet BWV 227 (choir) | 41% | 52% | 40% | 40% | 78 to 85% of four |
+| Bach, Prelude in C, BWV 846 (piano) | **97%** | 88% | **94%** | 60% | one player |
+| Mozart, quartet K. 458, Adagio | **88%** | 75% | 77% | 76% | 84% of four |
+| Joplin, Maple Leaf Rag (piano) | **91%** | 80% | **82%** | 72% | one player |
+| Telemann, canonic sonata no. 1, Vivace (two violins) | 79% | **83%** | 73% | **82%** | 80% with the canon rule, 50% without |
+| Beethoven, quartet Op. 18 No. 1, Adagio (live) | 49% | 42% | 42% | 44% | 71% of four |
+| Bach, chorale from the motet BWV 227 (choir) | 43% | 53% | 42% | 40% | 78 to 85% of four |
 
 Between 6% and 32% of notes would count as found by coincidence, most on the rag, whose sections repeat. Three things stand out. The instrument-aware model is not uniformly better: on two violins alone the plain detector with the held-note check matches or beats it. A live quartet in a slow movement is far harder than a studio one, and even ignoring fine timing only 68% of its pitches turn up in the right five-second stretch, against 89% for the Mozart. And voices are the weakest case of all: the model hears a choir mostly as strings and finds two notes in five, the plain detector finds the sopranos (81%) and loses the tenors (32%).
 
@@ -64,14 +64,16 @@ The plain detector and the instrument-aware model are different networks trained
 
 | Recording | Precision when both wrote the note | Only the model wrote it | Only the plain detector wrote it | Recall of the agreed notes alone | Recall of everything either wrote |
 |---|---|---|---|---|---|
-| Mozart quartet | **94%** | 69% | 46% | 61% | 93% |
-| Bach prelude (piano) | 91% | 86% | 12% | 81% | 94% |
-| Telemann (two violins) | **90%** | 54% | 68% | 70% | 90% |
-| Joplin rag (piano) | 78% | 73% | 41% | 72% | 85% |
-| Bach chorale (choir) | **66%** | 37% | 39% | 12% | 69% |
-| Beethoven quartet (live) | 56% | 36% | 30% | 29% | 56% |
+| Mozart quartet | **96%** | 70% | 48% | 62% | 94% |
+| Bach prelude (piano) | 95% | 93% | 12% | 84% | 97% |
+| Telemann (two violins) | **90%** | 53% | 69% | 70% | 91% |
+| Joplin rag (piano) | 84% | 84% | 45% | 78% | 92% |
+| Bach chorale (choir) | **72%** | 38% | 38% | 13% | 71% |
+| Beethoven quartet (live) | 58% | 36% | 31% | 30% | 57% |
 
-Agreement is the best single sign that a note is real on every one of the six, by 14 to 26 points over either source alone wherever strings or voices are involved, and it asks nothing about the instruments. On a piano the model needs no help: what only the plain detector wrote there is mostly overtones. `duet.py --cross-check` puts this to use. Notes only one source wrote are kept and coloured blue in the score, so the page shows which notes to check by ear. When the model hears one family almost alone (nine notes in ten), the notes only the plain detector wrote are added as well, since nothing else is playing that they could belong to; on the Telemann duet that lifts the notes found from 81% to 87%, with the doubtful 38% marked. With a piano in the room the plain detector's extra notes cannot be told from piano notes (8% of them are violin notes on the piece with piano), so there the rule only marks. Counting a note as agreed when the other source merely has that pitch sounding was tried and dropped: it mostly confirms the extra pieces of a held note that one source wrote in fragments.
+Agreement is the best single sign that a note is real on every one of the six, by 21 to 34 points over either source alone wherever strings or voices are involved, and it asks nothing about the instruments. On a piano the model needs no help: what only the plain detector wrote there is mostly overtones. `duet.py --cross-check` puts this to use. Notes only one source wrote are kept and coloured blue in the score, so the page shows which notes to check by ear. When the model hears one family almost alone (nine notes in ten), the notes only the plain detector wrote are added as well, since nothing else is playing that they could belong to; on the Telemann duet that lifts the notes found from 81% to 87%, with the doubtful 38% marked. With a piano in the room the plain detector's extra notes cannot be told from piano notes (8% of them are violin notes on the piece with piano), so there the rule only marks. Counting a note as agreed when the other source merely has that pitch sounding was tried and dropped: it mostly confirms the extra pieces of a held note that one source wrote in fragments.
+
+The score is laid over the stretch of the recording where something is heard, from the first note to the end of the last, not over the whole file. Pinning the score's first note to the file's first second had shifted every opening that starts with silence (0.8 s on the piece with piano, where the first seconds of piano then looked missing), and correcting it raised the notes found on all eight recordings with a score, most on the rag (84% to 91%) and the prelude (93% to 97%); the right-player figures above were measured before this correction.
 
 Lining the score up by individual notes instead of by harmony cut the typical timing error on the benchmark from 47 ms to 27 ms, and slow movements needed the score stretched to the recording's length first, since the alignment cannot bend the tempo by more than a factor of two.
 

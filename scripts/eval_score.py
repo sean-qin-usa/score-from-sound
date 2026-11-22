@@ -73,8 +73,13 @@ def align(score_notes, y, sr=amt.SR, onset_w=0.0, smooth=0, partial=False):
     that the score was matched to.
     """
     # The path may bend the tempo by at most a factor of two either way, so the score is first
-    # stretched to the recording's overall length; otherwise a movement played at half the
-    # score file's nominal tempo cannot be aligned at all.
+    # stretched to the length of the music; otherwise a movement played at half the score
+    # file's nominal tempo cannot be aligned at all. The music is the stretch between the first
+    # and last moments that are audible: a recording usually opens with silence and ends with
+    # reverberation, and pinning the score's first note to the file's first second shifted
+    # the whole opening (0.8 s on the piece with piano).
+    t0, t1 = (0.0, len(y) / sr) if partial else sounding_span(y, sr)
+    y = y[int(t0 * sr) : int(t1 * sr)]
     scale = 1.0 if partial else (len(y) / sr) / max(e for _, e, _ in score_notes)
     score_notes = [(s0 * scale, e0 * scale, p0) for s0, e0, p0 in score_notes]
     end = max(e for _, e, _ in score_notes)
@@ -104,11 +109,22 @@ def align(score_notes, y, sr=amt.SR, onset_w=0.0, smooth=0, partial=False):
         trend = at[0] + (st - st[0]) * (at[-1] - at[0]) / max(st[-1] - st[0], 1e-9)
         at = np.maximum.accumulate(ndi.median_filter(at - trend, size=smooth, mode="nearest") + trend)
 
+    at = at + t0
+
     def warp(t):
         return np.interp(np.asarray(t) * scale, st, at)
 
     warp.span = (float(at[0]), float(at[-1]))
     return warp, cost
+
+
+def sounding_span(y, sr=amt.SR, floor_db=-40.0):
+    """(first, last) second at which the recording is within `floor_db` of its loudest moment."""
+    rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=HOP)[0]
+    loud = np.flatnonzero(20 * np.log10(rms / (rms.max() + 1e-12) + 1e-12) > floor_db)
+    if not len(loud):
+        return 0.0, len(y) / sr
+    return float(loud[0] * HOP / sr), float(min((loud[-1] + 1) * HOP / sr, len(y) / sr))
 
 
 def _note_roll(notes, n_frames, sr=amt.SR, lo=28, hi=104):
@@ -134,7 +150,14 @@ def align_to_notes(score_notes, heard_notes, length_sec, sr=amt.SR, smooth=5):
     Harmony changes slowly in slow music, so a harmony-based path can slide within a chord;
     individual note starts pin the timing down. `heard_notes` are (start, end, pitch) in
     seconds and should come from a detector other than the transcription being judged.
+    The score is laid over the stretch from the first heard note to the end of the last one,
+    not over the whole file, so silence before the music or reverberation after it does not
+    shift the opening or the close.
     Returns (warp function with .span, mean cost)."""
+    t0 = min((s0 for s0, _, _ in heard_notes), default=0.0)
+    t1 = max((e0 for _, e0, _ in heard_notes), default=length_sec)
+    length_sec = t1 - t0
+    heard_notes = [(s0 - t0, e0 - t0, p0) for s0, e0, p0 in heard_notes]
     scale = length_sec / max(e for _, e, _ in score_notes)
     scaled = [(s0 * scale, e0 * scale, p0) for s0, e0, p0 in score_notes]
     n = int(length_sec * sr / HOP) + 1
@@ -152,6 +175,8 @@ def align_to_notes(score_notes, heard_notes, length_sec, sr=amt.SR, smooth=5):
 
         trend = at[0] + (st - st[0]) * (at[-1] - at[0]) / max(st[-1] - st[0], 1e-9)
         at = np.maximum.accumulate(ndi.median_filter(at - trend, size=smooth, mode="nearest") + trend)
+
+    at = at + t0
 
     def warp(t):
         return np.interp(np.asarray(t) * scale, st, at)
