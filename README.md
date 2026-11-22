@@ -115,7 +115,7 @@ The pop path has no ground truth behind it yet. Sung melodies and bass lines com
 
 ## Running it
 
-Python 3.10 and a GPU with about 8 GB of memory are enough. The separation models download themselves on first use and take a few gigabytes.
+Python 3.10 and a GPU with about 8 GB of memory are enough. The separation models download themselves on first use and take a few gigabytes. Fetching a recording from YouTube with yt-dlp now also needs a JavaScript runtime (Node.js or Deno) and the `yt-dlp-ejs` package, run as `yt-dlp --js-runtimes node -x --audio-format wav <url>`; without them YouTube refuses the download.
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate

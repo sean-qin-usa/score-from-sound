@@ -12,3 +12,4 @@ soundfile==0.14.0
 static-ffmpeg
 torch
 yt-dlp
+yt-dlp-ejs
