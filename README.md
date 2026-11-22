@@ -39,6 +39,8 @@ python -I scripts/duet.py recording.wav out/my_piece --notes-from out/my_piece/m
 python -I scripts/duet.py recording.wav out/my_piece --notes-from out/my_piece/model.mid --lowest G3 --cross-check   # mark notes only one detector wrote
 ```
 
+The model listens in windows of about two seconds, and a note that crosses the edge of a window is often cut in two, started late or lost. `run_yourmt3.py` therefore transcribes each recording twice, the second time with the window edges moved by half a window, and joins the two: a note both passes wrote is taken from the pass whose window edge is farther from it, and a note only one pass wrote is kept when it lies farther from that pass's edges than from the other's. Nothing in that rule was tuned. On the six recordings with a score it raised recall and precision together on every one, F from 74.4 to 75.7 on average and most on the Mozart quartet (82.0 to 84.2) and the Telemann (75.9 to 79.1), for twice the running time (`--single` runs one pass). A learned rule that kept or dropped each note from both note sources by its loudness, length, overtone relations and the like was also tried, trained on five recordings and tested on the sixth: it moved F from 72.2 to 72.6 on average, up on one recording and down on another, and was not adopted.
+
 The model's code and checkpoint are not part of this repository: they go under `tools/yourmt3/`, with their own environment in `.venv_mt3`.
 
 ## Six recordings it had never heard
@@ -47,12 +49,12 @@ The benchmark above is studio audio that the instrument-aware model was trained 
 
 | Recording | Notes found (recall): model | plain detector | Written notes in the score (precision): model | plain detector | Found notes given to the right player |
 |---|---|---|---|---|---|
-| Bach, Prelude in C, BWV 846 (piano) | **97%** | 88% | **94%** | 60% | one player |
-| Mozart, quartet K. 458, Adagio | **88%** | 75% | 77% | 76% | 84% of four |
-| Joplin, Maple Leaf Rag (piano) | **91%** | 80% | **82%** | 72% | one player |
-| Telemann, canonic sonata no. 1, Vivace (two violins) | 79% | **83%** | 73% | **82%** | 80% with the canon rule, 50% without |
-| Beethoven, quartet Op. 18 No. 1, Adagio (live) | 49% | 42% | 42% | 44% | 71% of four |
-| Bach, chorale from the motet BWV 227 (choir) | 43% | 53% | 42% | 40% | 78 to 85% of four |
+| Bach, Prelude in C, BWV 846 (piano) | **98%** | 88% | **95%** | 60% | one player |
+| Mozart, quartet K. 458, Adagio | **90%** | 75% | 78% | 76% | 83% of four |
+| Joplin, Maple Leaf Rag (piano) | **91%** | 80% | **83%** | 72% | one player |
+| Telemann, canonic sonata no. 1, Vivace (two violins) | 81% | **83%** | 76% | **82%** | 80% with the canon rule, 50% without |
+| Beethoven, quartet Op. 18 No. 1, Adagio (live) | 50% | 42% | 42% | 44% | 71% of four |
+| Bach, chorale from the motet BWV 227 (choir; one pass of the model) | 43% | 53% | 42% | 40% | 78 to 85% of four |
 
 Between 6% and 32% of notes would count as found by coincidence, most on the rag, whose sections repeat. Three things stand out. The instrument-aware model is not uniformly better: on two violins alone the plain detector with the held-note check matches or beats it. A live quartet in a slow movement is far harder than a studio one, and even ignoring fine timing only 68% of its pitches turn up in the right five-second stretch, against 89% for the Mozart. And voices are the weakest case of all: the model hears a choir mostly as strings and finds two notes in five, the plain detector finds the sopranos (81%) and loses the tenors (32%).
 
@@ -64,10 +66,10 @@ The plain detector and the instrument-aware model are different networks trained
 
 | Recording | Precision when both wrote the note | Only the model wrote it | Only the plain detector wrote it | Recall of the agreed notes alone | Recall of everything either wrote |
 |---|---|---|---|---|---|
-| Mozart quartet | **96%** | 70% | 48% | 62% | 94% |
-| Bach prelude (piano) | 95% | 93% | 12% | 84% | 97% |
-| Telemann (two violins) | **90%** | 53% | 69% | 70% | 91% |
-| Joplin rag (piano) | 84% | 84% | 45% | 78% | 92% |
+| Mozart quartet | **95%** | 73% | 46% | 64% | 95% |
+| Bach prelude (piano) | 95% | 93% | 11% | 85% | 98% |
+| Telemann (two violins) | **91%** | 59% | 70% | 71% | 91% |
+| Joplin rag (piano) | 84% | 86% | 45% | 78% | 92% |
 | Bach chorale (choir) | **72%** | 38% | 38% | 13% | 71% |
 | Beethoven quartet (live) | 58% | 36% | 31% | 30% | 57% |
 

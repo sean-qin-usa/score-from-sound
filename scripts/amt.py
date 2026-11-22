@@ -2,6 +2,8 @@
 from dataclasses import dataclass
 
 import librosa
+import math
+
 import numpy as np
 import pretty_midi
 import scipy.ndimage as ndi
@@ -539,6 +541,77 @@ def estimate_key(chroma_mean):
     return best[1], float(best[0])
 
 
+DIATONIC = (0, 2, 4, 5, 7, 9, 11)  # the major scale; a key signature is this set moved round the circle of fifths
+
+
+def signature_pitches(fifths):
+    """Pitch classes a key signature of `fifths` sharps (negative: flats) leaves unaltered."""
+    tonic = (7 * fifths) % 12
+    return {(tonic + d) % 12 for d in DIATONIC}
+
+
+def key_by_section(notes, bar_starts, change_cost=2.0, choices=range(-5, 7)):
+    """One key signature per bar, the way an editor would choose them.
+
+    A bar's notes (weighted by length) are scored against each signature by the share of
+    their length that falls outside it; a signature changes only where the change saves more
+    than `change_cost` bars' worth of out-of-key notes, so a chromatic passing note or a short
+    borrowed chord never flips the signature, while a section that stays in a new key does.
+    The minor mode's raised seventh costs a little everywhere and moves nothing. Bars with no
+    notes take whatever is cheapest around them. Returns a list of `fifths`, one per bar."""
+    choices = list(choices)
+    sets = [signature_pitches(f) for f in choices]
+    n = len(bar_starts)
+    ends = list(bar_starts[1:]) + [float("inf")]
+    cost = np.zeros((n, len(choices)))
+    for b, (lo, hi) in enumerate(zip(bar_starts, ends)):
+        w = np.zeros(12)
+        for x in notes:
+            overlap = min(x.end, hi) - max(x.start, lo)
+            if overlap > 0:
+                w[x.pitch % 12] += overlap
+        if w.sum() > 0:
+            w /= w.sum()
+            cost[b] = [sum(w[pc] for pc in range(12) if pc not in s) for s in sets]
+    # fewest accidentals breaks ties, so an empty or ambiguous stretch reads as the plainer key
+    cost += 1e-3 * np.abs(np.array(choices))[None, :]
+    total, back = cost[0].copy(), np.zeros((n, len(choices)), int)
+    for b in range(1, n):
+        stay = total
+        move = total.min() + change_cost
+        back[b] = np.where(stay <= move, np.arange(len(choices)), total.argmin())
+        total = np.minimum(stay, move) + cost[b]
+    path = [int(total.argmin())]
+    for b in range(n - 1, 0, -1):
+        path.append(int(back[b][path[-1]]))
+    return [choices[i] for i in reversed(path)]
+
+
+def spell(pitch, fifths):
+    """music21 pitch name for a MIDI note in a key signature: the scale's own letter when the
+    note is in the key, otherwise a sharp in sharp keys and a flat in flat keys."""
+    names_sharp = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    names_flat = ["C", "D-", "D", "E-", "E", "F", "G-", "G", "A-", "A", "B-", "B"]
+    pc, octave = pitch % 12, pitch // 12 - 1
+    if pc in signature_pitches(fifths):
+        # in the key: sharp keys spell with sharps, flat keys with flats (and the few that need
+        # B#, E#, Cb or Fb do so)
+        letters = "CDEFGAB"
+        tonic = (7 * fifths) % 12
+        steps = [(tonic + d) % 12 for d in DIATONIC]
+        start ="CGDAEBF"[fifths % 7] if fifths >= 0 else "CFBEADG"[(-fifths) % 7]
+        i = steps.index(pc)
+        letter = letters[(letters.index(start) + i) % 7]
+        natural = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}[letter]
+        alter = (pc - natural + 6) % 12 - 6
+        if letter == "B" and alter == 1:
+            octave -= 1
+        if letter == "C" and alter == -1:
+            octave += 1
+        return letter + ("#" * alter if alter > 0 else "-" * -alter) + str(octave)
+    return (names_sharp if fifths >= 0 else names_flat)[pc] + str(octave)
+
+
 def beat_chords(y, beats, sr=SR, per=2):
     """One chord label per `per` beats, from triad templates on beat-averaged chroma."""
     chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=512, bins_per_octave=36)
@@ -623,7 +696,7 @@ def write_midi(path, tracks, bpm):
         inst = pretty_midi.Instrument(program=0, is_drum=True, name=label) if program == "drums" else pretty_midi.Instrument(program=program, name=label)
         for n in notes:
             inst.notes.append(
-                pretty_midi.Note(velocity=int(40 + 70 * min(n.amp, 1.0)), pitch=n.pitch, start=max(n.start, 0), end=max(n.end, n.start + 0.05))
+                pretty_midi.Note(velocity=int(40 + 70 * min(n.amp, 1.0)), pitch=n.pitch, start=max(n.start, 0), end=max(n.end, max(n.start, 0) + 0.05))
             )
         pm.instruments.append(inst)
     pm.write(str(path))
@@ -638,6 +711,11 @@ def write_musicxml(path, tracks, bpm, key=None, meter="4/4", unsure_below=None, 
     score = stream.Score()
     score.insert(0, metadata.Metadata())
     spb = 60.0 / bpm
+    # notes before the first beat found would sit before the first bar: move everything later by
+    # whole bars instead, so the bar lines stay where they were
+    bar = m21meter.TimeSignature(meter).barDuration.quarterLength
+    earliest = min((n.start / spb for _, _, notes in tracks for n in notes), default=0.0)
+    lead = bar * math.ceil(-earliest / bar) if earliest < 0 else 0.0
     for label, clef_name, notes in tracks:
         part = stream.Part()
         inst = instrument.Instrument()
@@ -651,7 +729,7 @@ def write_musicxml(path, tracks, bpm, key=None, meter="4/4", unsure_below=None, 
             part.insert(0, m21key.Key(tonic.replace("b", "-"), mode))
         by_onset = {}
         for n in notes:
-            by_onset.setdefault(round(n.start / spb * 4) / 4, []).append(n)
+            by_onset.setdefault(round((n.start / spb + lead) * 4) / 4, []).append(n)
         for on, group in sorted(by_onset.items()):
             ql = max(0.25, round(max(g.end - g.start for g in group) / spb * 4) / 4)
             el = m21note.Note(group[0].pitch) if len(group) == 1 else m21chord.Chord(sorted({g.pitch for g in group}))

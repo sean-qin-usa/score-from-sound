@@ -423,7 +423,7 @@ def cross_check(notes, others, tol=0.15):
 
     Two detectors built differently and trained on different recordings rarely invent the same
     note, so a note both wrote is far more likely to be real than a note only one wrote (on a
-    string quartet neither had heard: 96% against 70% and 48%). Nothing about the instruments
+    string quartet neither had heard: 95% against 73% and 46%). Nothing about the instruments
     is assumed. Notes pair off one to one: same pitch, starts within `tol` seconds, nearest
     first. Pairing by "the other source has this pitch sounding" was tried and confirms the
     extra pieces of a held note that one source wrote in fragments, which are mostly wrong.
