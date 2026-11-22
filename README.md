@@ -77,6 +77,21 @@ The score is laid over the stretch of the recording where something is heard, fr
 
 Lining the score up by individual notes instead of by harmony cut the typical timing error on the benchmark from 47 ms to 27 ms, and slow movements needed the score stretched to the recording's length first, since the alignment cannot bend the tempo by more than a factor of two.
 
+## Beats and bar lines
+
+Writing a recording as sheet music means finding where every beat falls, however much the tempo moves, and where each bar begins; the notes are then placed between the beats around them. The scores above give the true beat times of six recordings, so both beat finders were checked against them, in the score's own meter. "In step" is the share of the piece where the found beats keep matching the true ones, at the notated beat or at twice or half its rate.
+
+| Recording | Meter | Old beat finder: in step | Beat This!: in step | Beat This!: bar lines right | Beat This!: beats per bar |
+|---|---|---|---|---|---|
+| Bach prelude (piano) | 4/4 | 4% | **59%** | 0.71 | 4, right |
+| Joplin rag (piano) | 2/4 | 76% | 73% | 0.82 | 2, right |
+| Mozart quartet, Adagio | 4/4 | 0% | **43%** | 0.35 | 2 (half bars) |
+| Telemann, two violins, counted in quarters | 6/4 | **83%** | 32% | 0.35 | wrong |
+| Beethoven quartet, live Adagio, counted in eighths | 9/8 | 31% | 18% | 0.07 | wrong |
+| Smoke (violins and piano) | 4/4 | 19% | 21% | 0.29 | 2 (half bars) |
+
+[Beat This!](https://github.com/CPJKU/beat_this) (Foscarin, Schlüter and Widmer, 2024; MIT) is a beat and bar tracker trained across many styles; `scripts/run_beats.py` runs it from `tools/beat_this/` in the instrument-aware model's environment. It settles the piano pieces, meter included, and fails where the old finder fails: slow, freely played strings. Neither is reliable enough yet to put bar lines into every score unattended, so the scores written here are drafts whose bar lines need checking wherever the music is slow or free.
+
 ## Where it falls short
 
 Telling the two players apart is the weak point, and what helps depends on the recording. In mono, nothing in the pitches says which violin is playing when one of them plays alone: on a piece with a full score to check against, the two violins' solo passages sat in practically the same range, and the best possible pitch cut-off placed 57% of those notes correctly. A stereo recording can carry the answer in where each player sits. When the notes of a recording are spread widely between left and right, the parts are divided by side instead, which on that piece (two violins about 7 dB apart, with piano) placed 83% of violin notes in the right part against 62% for pitch movement; mixing the two kinds of evidence did worse than position alone, because the piano's notes pull the pitch-based logic around. The spread that triggers this was set from three recordings and `--no-stereo` turns it off. For mono recordings a `--solo` hint for passages you know are one player, and a `--roles` mode that divides the music into a sustained line and a moving line, are the workarounds; the roles mode suits pieces where each player keeps a role for a whole phrase and scored worse than the plain split on the piece above, where the pattern changes almost every bar. A relative version was tried and dropped: each part remembered the typical length of its recent notes, so that a note went to the part whose recent notes it resembled and roles could change only after a rest. It moved the right-player share on the two-violin benchmark from 85.0% to 85.7%, lowered it from 74.6% to 72.0% on the piece with piano when split by pitch alone, and did not make the roles on the mono duet any steadier.
@@ -138,6 +153,7 @@ The duet tool also asks a question that does not depend on pitch movement: which
 - `scripts/pop.py` and `scripts/run_pop.sh` are the pop path.
 - `scripts/duet.py` is the two-instrument path, including the part splitter.
 - `scripts/run_yourmt3.py` runs the instrument-aware model whose output `duet.py` can take in place of its own detector.
+- `scripts/run_beats.py` runs the Beat This! beat and bar tracker.
 - `scripts/eval_urmp.py`, `scripts/eval_score.py` and `scripts/eval_ensemble.py` are the checkers: against the benchmark's annotations, against a score read from pages, and against a machine-readable score for any number of players.
 - `scripts/eval_detectors.py` gives recall and precision for both note sources on one recording, and for the notes they agree and disagree on.
 - `scripts/run_vocal.py` runs two published models for unaccompanied vocal ensembles (Cuesta, McFee and Gómez, 2020; Cuesta and Gómez, 2022; both MIT) from their own repositories under `tools/`, in a separate environment (`.venv_vocal`). On the chorale above it found 80% of the notes with 62% of what it wrote in the score, against 41 to 52% and 40% for the two note sources used elsewhere here. It is a first test on one recording and is not wired into the other tools.
