@@ -156,6 +156,36 @@ def split_two_voices(notes, beam=96, idle=0.0, dur_w=0.0, ring_ok=False, role_w=
     return A, B
 
 
+def heal_lines(A, B, window=1.0, reach=12):
+    """A lone note does not interrupt a line.
+
+    A note sitting in one part with nothing else of that part within `window` seconds, while
+    the other part's line runs on both sides of it (its notes before and after lie within
+    `window` and `reach` semitones) and that part is free at that moment, is moved into the
+    other part. On the test piece almost every wrong-part note was such a single note, after
+    which the line carried on in the right part."""
+    moved = 0
+    for _ in range(2):  # a second sweep catches a pair the first one split
+        for P, Q in ((A, B), (B, A)):
+            for n in sorted(P, key=lambda n: n.start):
+                if any(m is not n and abs(m.start - n.start) < window for m in P):
+                    continue
+                before = [m for m in Q if n.start - window < m.start < n.start]
+                after = [m for m in Q if n.start < m.start < n.end + window]
+                if not before or not after:
+                    continue
+                if min(abs(m.pitch - n.pitch) for m in before) > reach or min(abs(m.pitch - n.pitch) for m in after) > reach:
+                    continue
+                if any(min(m.end, n.end) - max(m.start, n.start) > 0.15 for m in Q):
+                    continue  # the other part is sounding then (beyond legato): this is the second player
+                P.remove(n)
+                Q.append(n)
+                moved += 1
+    A.sort(key=lambda n: n.start)
+    B.sort(key=lambda n: n.start)
+    return moved
+
+
 def trim_tails(part, same_onset=0.05, tail=0.15):
     """Within one part, cut short ring-over into the next note, but keep real chords.
 
@@ -539,6 +569,7 @@ def main():
     A, B = trim_tails(A), trim_tails(B)
     if not args.keep_leaps:
         A, B = drop_leap_blips(A), drop_leap_blips(B)
+    healed = 0 if args.roles or args.canon else heal_lines(A, B)
     if not args.roles and not args.canon and np.mean([n.pitch for n in A] or [0]) < np.mean([n.pitch for n in B] or [0]):
         A, B = B, A
     names = ("Sustained line", "Moving line") if args.roles else ("Leader", "Follower") if args.canon else ("Violin 1", "Violin 2")
@@ -567,6 +598,7 @@ def main():
         "share_of_duet_time_part2_above_part1": frac_inverted,
         "chroma_agreement_with_audio": amt.chroma_agreement(A + B, y),
         "how_parts_were_split": stereo,
+        "lone_notes_moved_back_into_their_line": healed,
         "notes_where_tone_disputes_the_split": None if disputed is None else len(disputed) / max(len(A) + len(B), 1),
         "notes_only_one_source_wrote": sum(n.seen < 1.0 for n in A + B) / max(len(A) + len(B), 1) if args.cross_check else None,
         "tempo_bpm": bpm,

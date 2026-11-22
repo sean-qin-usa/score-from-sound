@@ -35,6 +35,7 @@ VARIANTS = {
     "merge_held": dict(min_ms=58, onset=0.5, frame=0.3, fmax=4200.0, ghosts=False, trim=True, leap=True, held=True),
     "register_4": dict(min_ms=58, onset=0.5, frame=0.3, fmax=4200.0, ghosts=False, trim=True, leap=True, held=True, split=dict(register_w=4.0)),
     "register_8": dict(min_ms=58, onset=0.5, frame=0.3, fmax=4200.0, ghosts=False, trim=True, leap=True, held=True, split=dict(register_w=8.0)),
+    "heal_lines": dict(min_ms=58, onset=0.5, frame=0.3, fmax=4200.0, ghosts=False, trim=True, leap=True, held=True, heal=True, split=dict(register_w=4.0)),
     "merge_repeats": dict(min_ms=58, onset=0.5, frame=0.3, fmax=4200.0, ghosts=False, trim=True, merge=0.03),
     "quiet_notes": dict(min_ms=110, onset=0.3, frame=0.2, fmax=3600.0, ghosts=True, trim=True),
 }
@@ -100,6 +101,8 @@ def run(mix, cfg):
         A, B = duet.trim_tails(A), duet.trim_tails(B)
     if cfg.get("leap"):
         A, B = duet.drop_leap_blips(A), duet.drop_leap_blips(B)
+    if cfg.get("heal"):
+        duet.heal_lines(A, B)
     return raw, A, B
 
 
