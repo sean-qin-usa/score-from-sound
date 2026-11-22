@@ -88,7 +88,7 @@ Writing a recording as sheet music means finding where every beat falls, however
 | Mozart quartet, Adagio | 4/4 | 0% | **43%** | 0.35 | 2 (half bars) |
 | Telemann, two violins, counted in quarters | 6/4 | **83%** | 32% | 0.35 | wrong |
 | Beethoven quartet, live Adagio, counted in eighths | 9/8 | 31% | 18% | 0.07 | wrong |
-| Smoke (violins and piano) | 4/4 | 19% | 21% | 0.29 | 2 (half bars) |
+| Two violins and piano (the score read from pages) | 4/4 | 19% | 21% | 0.29 | 2 (half bars) |
 
 [Beat This!](https://github.com/CPJKU/beat_this) (Foscarin, Schlüter and Widmer, 2024; MIT) is a beat and bar tracker trained across many styles; `scripts/run_beats.py` runs it from `tools/beat_this/` in the instrument-aware model's environment. It settles the piano pieces, meter included, and fails where the old finder fails: slow, freely played strings. Neither is reliable enough yet to put bar lines into every score unattended, so the scores written here are drafts whose bar lines need checking wherever the music is slow or free.
 
