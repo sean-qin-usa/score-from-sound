@@ -1,6 +1,6 @@
-# acapella-transcribe
+# score-from-sound
 
-Turn a recording into a draft score. The tools here split a song into stems, write down the notes in each one, and export MIDI and MusicXML that open in MuseScore, so that arranging for a vocal group or a string duo starts from a draft instead of a blank page.
+Turn a recording into a draft score. The tools here split a song into stems, write down the notes in each one, and export MIDI and MusicXML that open in MuseScore, so that arranging or learning a piece, whether for a string duo, a quartet, a piano or a vocal group, starts from a draft instead of a blank page.
 
 There are two paths, because two kinds of recording fail in different ways. A pop song can be pulled apart by timbre (voice, bass, drums, everything else) and each stem transcribed on its own. A duet of two violins cannot, since the separation models rely on the instruments sounding different; there the notes are transcribed from the mix and divided into two parts afterwards.
 
